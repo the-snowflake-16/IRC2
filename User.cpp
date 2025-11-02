@@ -75,6 +75,20 @@ bool User::getRegistered() const{
 	return this->registered;
 }
 
+bool User::getInvited() const{
+	return this->invited;
+}
+
+bool User::getParam() const{
+	return this->param;
+}
+
+void User::setParam(bool param) {
+	this->param = param;
+}
+void User::setInvited(bool invited) {
+	this->invited = invited;
+}
 void User::setNickname(std::string const &nickname) {
 	this->nickname = nickname;
 }

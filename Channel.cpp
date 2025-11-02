@@ -122,10 +122,6 @@ bool Channel::isFull() const {
 	return false;
 }
 
-// void Channel::setInviteOnly(bool b) {
-// 	 this->inviteOnly = b;
-// }
-
 void Channel::setTopicRestricted(bool b) {
 	this->topicRestricted = b;
 }
@@ -250,10 +246,10 @@ User* Channel::getUserByNick(const std::string& nick) const {
     // clients — это, допустим, std::vector<User*>
     for (std::vector<User*>::const_iterator it = clients.begin(); it != clients.end(); ++it) {
         if ((*it)->getNickname() == nick) {
-            return *it; // нашли пользователя
+            return *it; 
         }
     }
-    return NULL; // nullptr ещё нет в C++98, используем NULL
+    return NULL;
 }
 
 bool Channel::isInvited(const std::string &nick) const {

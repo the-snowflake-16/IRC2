@@ -71,32 +71,48 @@ User* Server::getUserByNickname(const std::string& nickname) {
     return NULL;
 }
 
-
 int handleModeCommand(User &user, const std::string &command, std::set<Channel*> &channels)
 {
-    // Проверка регистрации
-    if (!user.getRegistered()) {
-        std::string err = ":server 451 " + user.getNickname() + " :You have not registered\r\n";
-        send(user.getFd(), err.c_str(), err.size(), 0);
-        return -8;
-    }
 
-    // Разбор команды: MODE #канал +флаги [параметр]
-    std::istringstream iss(command.substr(5));
-    std::string channelName, modeFlags, param;
-    iss >> channelName >> modeFlags;
-    std::getline(iss, param);
-    param = Channel::trimTopic(param);
+	std::istringstream iss(command.substr(5));
+	std::string channelName, modeFlags, param;
+	iss >> channelName >> modeFlags >> param;
 
-    if (channelName.empty() || modeFlags.empty()) {
-        std::string err = ":server 461 " + user.getNickname() + " MODE :Not enough parameters\r\n";
+	if (channelName.empty()) {
+		std::string err = ":server 461 " + user.getNickname() + " MODE :Not enough parameters\r\n";
+		send(user.getFd(), err.c_str(), err.size(), 0);
+		return -1;
+	}
+
+	if (modeFlags.empty()) {
+		std::string err = ":server 461 " + user.getNickname() + " MODE :Not enough parameters\r\n";
+		send(user.getFd(), err.c_str(), err.size(), 0);
+		return -1;
+	}
+
+    // std::istringstream tmp(modeFlags);
+    // tmp >> modeFlags; 
+
+	std::cout <<"mode flags" << modeFlags << std::endl;
+
+	if(!param.empty() && (modeFlags == "+i" || modeFlags == "-i"))
+	{
+		std::string err = ":server 482 " + user.getNickname() + " " + channelName + " MODE :Unexpected parameter for mode i\r\n";
         send(user.getFd(), err.c_str(), err.size(), 0);
         return -1;
-    }
+	}
+	
+	if(!param.empty() && (modeFlags == "+t" || modeFlags == "-t"))
+	{
+		std::string err = ":server 482 " + user.getNickname() + " " + channelName + " MODE :Unexpected parameter for mode t\r\n";
+        send(user.getFd(), err.c_str(), err.size(), 0);
+        return -1;
+	}
+    std::istringstream iss2(command.substr(5));
+    iss2 >> channelName;
 
     Channel* channel = NULL;
-    std::set<Channel*>::iterator it;
-    for (it = channels.begin(); it != channels.end(); ++it) {
+    for (std::set<Channel*>::iterator it = channels.begin(); it != channels.end(); ++it) {
         if ((*it)->getName() == channelName) {
             channel = *it;
             break;
@@ -108,7 +124,6 @@ int handleModeCommand(User &user, const std::string &command, std::set<Channel*>
         send(user.getFd(), err.c_str(), err.size(), 0);
         return -1;
     }
-
     if (!channel->isOperator(&user)) {
         std::string err = ":server 482 " + user.getNickname() + " " + channelName + " :You're not channel operator\r\n";
         send(user.getFd(), err.c_str(), err.size(), 0);
@@ -116,65 +131,85 @@ int handleModeCommand(User &user, const std::string &command, std::set<Channel*>
     }
 
     bool add = true;
-	std::istringstream paramStream(param);
+    std::string paramsOut;
+
     for (size_t i = 0; i < modeFlags.size(); ++i) {
         char c = modeFlags[i];
-        if (c == '+') add = true;
-        else if (c == '-') add = false;
-        else if (c == 'i') channel->setInviteOnly(add);
-        else if (c == 't') channel->setTopicRestricted(add);
+        if (c == '+') { add = true; continue; }
+        if (c == '-') { add = false; continue; }
+        if (c == 'i') {
+            channel->setInviteOnly(add);
+        }
+        else if (c == 't') {
+			if (!param.empty()) 
+			{
+				std::cout << ":server 461 " + user.getNickname() + " MODE :Unexpected parameter for mode t\r\n";
+				return -1;
+			}
+			channel->setTopicRestricted(add);
+			}
 		else if (c == 'k') {
-			std::string key;
-			paramStream >> key;
-			if (add && key.empty()) {
-				std::string err = ":server 461 " + user.getNickname() + " MODE :Not enough parameters\r\n";
-				send(user.getFd(), err.c_str(), err.size(), 0);
-				continue; // можно заменить на return -1, если хочешь остановить выполнение
+			if (add && param.empty()) {
+				std::cout << ":server 461 " + user.getNickname() + " MODE :Not enough parameters\r\n";
+				return -1;
 			}
 
-			if (add) channel->setPassword(key);
+			if (add) channel->setPassword(param);
 			else channel->removePassword();
 		}
-		else if (c == 'o') {
-			std::string targetNick;
-			paramStream >> targetNick;
-			if (targetNick.empty()) continue;
 
-			User* targetUser = channel->getUserByNick(targetNick);
-			if (!targetUser || !channel->hasClient(targetUser)) {
-				std::string err = ":server 441 " + user.getNickname() + " " + targetNick + " " + channel->getName() + " :They aren't on that channel\r\n";
-				send(user.getFd(), err.c_str(), err.size(), 0);
-				continue;
-			}
+        else if (c == 'o') {
+            std::string targetNick;
+            if (targetNick.empty()) {
+                continue;
+            }
+            User* targetUser = channel->getUserByNick(targetNick);
+            if (!targetUser || !channel->hasClient(targetUser)) {
+                std::string err = ":server 441 " + user.getNickname() + " " + targetNick + " " + channel->getName() + " :They aren't on that channel\r\n";
+                send(user.getFd(), err.c_str(), err.size(), 0);
+                continue;
+            }
+            if (add) channel->addOperator(targetUser);
+            else channel->removeOperator(targetUser);
 
-			if (add) channel->addOperator(targetUser);
-			else channel->removeOperator(targetUser);
-		}
+            if (!paramsOut.empty()) paramsOut += " ";
+            paramsOut += targetNick;
+        }
         else if (c == 'l') {
             if (add) {
-                std::istringstream iss_limit(param);
-                size_t limit = 0;
-                if (!(iss_limit >> limit)) channel->removeUserLimit();
-                else channel->setUserLimit(limit);
+                std::string limitStr;
+                if (limitStr.empty()) {
+                    channel->removeUserLimit();
+                } else {
+                    size_t limit = 0;
+                    std::istringstream iss_limit(limitStr);
+                    if (iss_limit >> limit) channel->setUserLimit(limit);
+                    else channel->removeUserLimit();
+                    if (!paramsOut.empty()) paramsOut += " ";
+                    paramsOut += limitStr;
+                }
             } else {
                 channel->removeUserLimit();
             }
         }
+        else {
+            std::cerr << "[MODE] Unknown mode flag: " << c << std::endl;
+        }
     }
 
-    // Broadcast сообщения о смене режима
     std::string modeMsg = ":" + user.getNickname() + "!" + user.getUsername() +
                           "@localhost MODE " + channelName + " " + modeFlags;
-    // if (!param.empty()) modeMsg += " " + param;
+    if (!paramsOut.empty()) modeMsg += " " + paramsOut;
     modeMsg += "\r\n";
 
     channel->broadcastMessage(modeMsg);
 
     std::cout << "[MODE] " << user.getNickname() << " changed mode for "
-              << channelName << " to: " << modeFlags << " param: " << param << std::endl;
+              << channelName << " to: " << modeFlags << " params: " << paramsOut << std::endl;
 
-    return 0; // успех
+    return 0;
 }
+
 
 int Server::processCommand(User &user, std::string command) {
 	if (command.compare(0, 4, "PING") == 0) {
@@ -402,26 +437,31 @@ int Server::processCommand(User &user, std::string command) {
 						}
 						for (std::set<Channel *>::iterator it = channels.begin(); it != channels.end(); ++it) {
 							if ((*it)->getName() == channelsNew[j] && (*it)->getPassword().empty()) {
-								  // ✅ Проверка invite-only
 							if ((*it)->getName() == channelsNew[j]) {
-									// ✅ Проверка invite-only
-									if ((*it)->isInviteOnly() && !(*it)->isInvited(user.getNickname())) {
+									if ((*it)->isInviteOnly() && !user.getInvited()){
+										if((*it)->isInvited(user.getUsername())) {
+											std::cout << "he is invited add him pls " << user.getUsername() << std::endl;
+										}
 										std::string errMsg = ":server 473 " + user.getNickname() + " " + (*it)->getName() + " :Cannot join channel (+i)\r\n";
 										send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
 
-										std::cerr << "[JOIN] User " << user.getNickname() 
+										std::cerr << "[JOIN] User " << user.getNickname()
 												<< " tried to join invite-only channel " 
 												<< (*it)->getName() << " without invite." << std::endl;
 
-										// Пользователь не добавляется в канал
+										
 										flag = true;
 										return -6;
 									}
-									// Если проверка прошла — добавляем пользователя
+									
 									(*it)->addClient(&user);
-									sendJoinReply(user, *it);
+									sendJoinReply(user, (*it));
+									if (user.getInvited()) {
+										user.setInvited(false);
+										(*it)->removeInvitedUser(user.getUsername());
+								}
 									flag = true;
-									continue;
+									break;
 							}}
 							else if (key != "" && (*it)->getName() == channelsNew[j] && (*it)->getPassword() == key) {
 								(*it)->addClient(&user);
@@ -595,10 +635,8 @@ int Server::processCommand(User &user, std::string command) {
 										"@localhost INVITE " + targetNick + " :" + channelName + "\r\n";
 
 				send(targetUser->getFd(), inviteMsg.c_str(), inviteMsg.size(), 0);
-				
-				// // ✅ Добавляем пользователя в список приглашённых
-				// channel->addInvitedUser(targetNick);
-				
+				targetUser->setInvited(true);
+				channel->addInvitedUser(targetNick);
 				std::cout << "[INVITE] " << user.getNickname() << " invited " 
 						<< targetNick << " to " << channelName << std::endl;
 				return 7;

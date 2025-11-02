@@ -14,6 +14,8 @@ class User {
 		std::string buffer;
                 User();
 		bool registered;      // зарегистрирован ли (получил и NICK, и USER)
+		bool invited;
+		bool param;
 	public:
 		User(User const &other);
                 User& operator=(User const &other);
@@ -26,12 +28,16 @@ class User {
 		std::string getPass() const;
 		int getFd() const;
 		bool getRegistered() const;
+		bool getInvited()const;
+		bool getParam() const;
 		void setPass(std::string const &pass);
 		void setNickname(std::string const &nickname);
 		void setUsername(std::string const &username);
 		void setRealname(std::string const &realname);
 		void setHostname(std::string const &hostname);
 		void setRegistered(bool registered);
+		void setInvited(bool invited);
+		void setParam(bool param);
 		std::string &getBuffer();
 };
 
