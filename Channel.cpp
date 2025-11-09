@@ -135,12 +135,12 @@ void Channel::removePassword() {
 }
 
 void Channel::setUserLimit(size_t l) {
-	if (l == 0) ;
-	else if (l < this->clients.size() || l < 1) {
-		std::cerr << "Your limit is too low" << std::endl;
-		return ;
-	}
-	this->userLimit = l;
+    if (l < clients.size() || l < 1) {
+        std::cerr << "[Channel] Limit too low. Current users: " 
+                  << clients.size() << ", attempted limit: " << l << std::endl;
+        return;
+    }
+    userLimit = l;
 }
 
 void Channel::removeUserLimit() {
@@ -152,7 +152,13 @@ void Channel::addClient(User *user) {
 		if ((*it)->getFd() == user->getFd())
 			return ;
 	}
-	this->clients.push_back(user);
+	if (isFull()) {
+        std::cerr << "[Channel] Cannot add user " << user->getNickname() 
+                  << ": channel is full (" << userLimit << ")\n";
+        return;
+    } else {
+		this->clients.push_back(user);
+	}
 }
 
 void Channel::removeClient(User *user) {
@@ -173,7 +179,14 @@ void Channel::removeClient(std::string& name) {
 		if ((*it)->getNickname() == name) {
 			clients.erase(it);
 			break;
+		}	
+	}
+	for (std::vector<User *>::iterator itOp = this->operators.begin(); itOp != operators.end(); itOp++) {
+		if ((*itOp)->getNickname() == name) {
+			operators.erase(itOp);
+			break;
 		}
+		
 	}
 }
 
@@ -243,7 +256,6 @@ void Channel::broadcastMessage(const std::string& msg) {
 }
 
 User* Channel::getUserByNick(const std::string& nick) const {
-    // clients — это, допустим, std::vector<User*>
     for (std::vector<User*>::const_iterator it = clients.begin(); it != clients.end(); ++it) {
         if ((*it)->getNickname() == nick) {
             return *it; 
@@ -278,7 +290,6 @@ void Channel::removeInvitedUser(const std::string &nick) {
         return inviteOnly;
     }
 
-    // Можно добавить сеттер для inviteOnly, если нужно менять позже
     void Channel::setInviteOnly(bool value) {
         inviteOnly = value;
     }

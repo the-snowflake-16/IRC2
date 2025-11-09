@@ -13,9 +13,10 @@ class User {
 		std::string pass;
 		std::string buffer;
                 User();
-		bool registered;      // зарегистрирован ли (получил и NICK, и USER)
+		bool registered;
 		bool invited;
 		bool param;
+		  std::string currentChannel;
 	public:
 		User(User const &other);
                 User& operator=(User const &other);
@@ -38,6 +39,8 @@ class User {
 		void setRegistered(bool registered);
 		void setInvited(bool invited);
 		void setParam(bool param);
+		void setCurrrentChannel(const std::string &channel);
+		std::string getCurrentChanne() const;
 		std::string &getBuffer();
 };
 

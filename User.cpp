@@ -108,3 +108,11 @@ void User::setHostname(std::string const &hostname) {
 void User::setRegistered(bool registered) {
 	this->registered = registered;
 }
+
+void User::setCurrrentChannel(const std::string &channel) {
+	currentChannel = channel;
+}
+
+std::string User::getCurrentChanne() const {
+	return currentChannel;
+}
