@@ -168,6 +168,7 @@ int handleModeCommand(User &user, const std::string &command, std::set<Channel*>
 					return -1;
 				}
 
+
 				channel->setPassword(param);
 				paramsOut = param; 
 				std::cout << "[MODE] " << user.getNickname() << " set key for " << channel->getName() << ": " << param << std::endl;
@@ -190,6 +191,7 @@ int handleModeCommand(User &user, const std::string &command, std::set<Channel*>
 				std::cout << "[MODE] " << user.getNickname() << " removed key for " << channel->getName() << std::endl;
 			}
 		}
+
 		else if (c == 'o') {
 			User* targetUser = channel->getUserByNick(param);
 			if (!targetUser || !channel->hasClient(targetUser)) {
@@ -463,44 +465,57 @@ int Server::processCommand(User &user, std::string command) {
 						}
 
 						for (std::set<Channel *>::iterator it = channels.begin(); it != channels.end(); ++it) {
-							if ((*it)->getName() == channelsNew[j]) {
-								if ((*it)->isFull()) {
-									std::string errMsg = ":server 473 " + user.getNickname() + " " + (*it)->getName() + " :Cannot join channel (+l)\r\n";
-									send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
-									flag = true;
-									break; 
-								}
-
-								if ((*it)->isInviteOnly() && !user.getInvited()) {
-									if ((*it)->isInvited(user.getUsername())) {
-										std::cout << "he is invited add him pls " << user.getUsername() << std::endl;
-									}
-									std::string errMsg = ":server 473 " + user.getNickname() + " " + (*it)->getName() + " :Cannot join channel (+i)\r\n";
-									send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
-
-									std::cerr << "[JOIN] User " << user.getNickname()
-											<< " tried to join invite-only channel " 
-											<< (*it)->getName() << " without invite." << std::endl;
-									flag = true;
-									break;
-								}
-
-								if (key != "" && (*it)->getPassword() != key) {
-									std::string errMsg = ":server 475 " + user.getNickname() + " " + (*it)->getName() + " :Cannot join channel (+k) - bad key\r\n";
-									send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
-									flag = true;
-									break;
-								}
-
-								(*it)->addClient(&user);
-								sendJoinReply(user, *it);
-								if (user.getInvited()) {
-									user.setInvited(false);
-									(*it)->removeInvitedUser(user.getUsername());
-								}
+						if ((*it)->getName() == channelsNew[j]) {
+						if (!(*it)->getPassword().empty()) {
+							if (key == "") {
+								std::string errMsg = ":server 475 " + user.getNickname() + " " + (*it)->getName()
+													+ " :Cannot join channel (+k) - bad key\r\n";
+								send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
 								flag = true;
 								break;
 							}
+							if (key != (*it)->getPassword()) {
+								std::string errMsg = ":server 475 " + user.getNickname() + " " + (*it)->getName()
+													+ " :Cannot join channel (+k) - bad key\r\n";
+								send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
+								flag = true;
+								break;
+							}
+						}
+
+						if ((*it)->isInviteOnly()) {
+							if (!(*it)->isInvited(user.getUsername())) {
+								std::string errMsg = ":server 473 " + user.getNickname() + " " + (*it)->getName()
+													+ " :Cannot join channel (+i)\r\n";
+								send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
+
+								std::cerr << "[JOIN] User " << user.getNickname()
+										<< " tried to join invite-only channel " << (*it)->getName()
+										<< " without invite." << std::endl;
+
+								flag = true;
+								break;
+							}
+						}
+
+						if ((*it)->isFull()) {
+							std::string errMsg = ":server 473 " + user.getNickname() + " " + (*it)->getName()
+												+ " :Cannot join channel (+l)\r\n";
+							send(user.getFd(), errMsg.c_str(), errMsg.size(), 0);
+							flag = true;
+							break;
+						}
+
+						(*it)->addClient(&user);
+						sendJoinReply(user, *it);
+						if (user.getInvited()) {
+							user.setInvited(false);
+							(*it)->removeInvitedUser(user.getUsername());
+						}
+						flag = true;
+						break;
+					}
+					
 						}
 
 								if (!flag) {
